@@ -1,5 +1,8 @@
 import * as C from '../calc.js';
-import { store, esc, help, themeColor, themeBadge, signed, na, cell, perCell, loadNews } from '../ui.js';
+import { store, esc, help, themeColor, themeBadge, signed, na, cell, perCell, loadNews, exportFooter } from '../ui.js';
+import { exportWrappedTable } from '../export.js';
+
+const PER_PAGE = 7;
 
 export async function renderTheme(app, id) {
   const t = store.themes.find((x) => x.id === id);
@@ -61,7 +64,8 @@ export async function renderTheme(app, id) {
         ${tile('売上の成長率', 'sales_cagr_3y', C.isNum(med.sales_cagr_3y) ? C.fmtPct(med.sales_cagr_3y) : na(), '中央値・3年の年平均')}
       </div>
     </section>
-    <h2>候補の銘柄と「テーマとの関係」（時価総額の大きい順）</h2>
+    <div class="chart-head" style="margin-top:1.6em"><h2 style="margin:0">候補の銘柄と「テーマとの関係」（時価総額の大きい順）</h2>
+      <div class="row"><span class="small muted">スライド用PNG：</span>${Array.from({ length: Math.ceil(members.length / PER_PAGE) }, (_, i) => `<button type="button" class="btn small" data-page="${i}">${i * PER_PAGE + 1}〜${Math.min(members.length, (i + 1) * PER_PAGE)}社目</button>`).join('')}</div></div>
     <p class="muted small">「テーマとの関係」は公開情報をもとに作った一言メモです。出典のリンク先で確認し、レポートでは会社の公式資料（統合報告書・決算説明資料など）も確認してください。銘柄の追加・削除は<a href="#/about">データについて</a>の手順で行えます。</p>
     <div class="stock-list">${cards}</div>
     <section class="card" style="margin-top:16px">
@@ -69,6 +73,19 @@ export async function renderTheme(app, id) {
       <div id="theme-news" class="muted">読み込み中…</div>
     </section>
   `;
+
+  app.querySelectorAll('[data-page]').forEach((b) => b.addEventListener('click', () => {
+    const i = Number(b.dataset.page);
+    const part = members.slice(i * PER_PAGE, (i + 1) * PER_PAGE);
+    exportWrappedTable({
+      title: `テーマ「${t.name}」の候補銘柄（${i * PER_PAGE + 1}〜${i * PER_PAGE + part.length}社目／全${members.length}社）`,
+      subtitle: '時価総額の大きい順。「テーマとの関係」は公開情報をもとにした要約',
+      footer: `${exportFooter()}｜関係の出典は各銘柄のページを参照`,
+      columns: [{ label: '銘柄', width: 1.5, wrap: true }, { label: 'テーマとの関係', width: 4.2, wrap: true }, { label: '時価総額', width: 0.9, align: 'right' }],
+      rows: part.map((m) => [`${m.name}（${m.code}）`, m.reasons[id].reason, C.isNum(m.market_cap) ? C.fmtJpAmount(m.market_cap) : '取得できず']),
+      filename: `theme_${id}_${i + 1}.png`,
+    });
+  }));
 
   const news = await loadNews();
   const items = (news.themes?.[id] || []).slice(0, 15);

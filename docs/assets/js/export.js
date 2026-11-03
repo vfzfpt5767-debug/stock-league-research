@@ -194,3 +194,66 @@ function fit(ctx, text, maxW) {
   while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
   return t + '…';
 }
+
+// 文章を折り返す表（例：銘柄と「テーマとの関係」）。1枚に入る行だけ描く
+export async function exportWrappedTable({ title, subtitle, footer, columns, rows, filename, note }) {
+  const pal = palette(true);
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const area = frame(ctx, { title, subtitle, footer });
+  const tableW = W - PAD * 2;
+  const totalRatio = columns.reduce((s, c) => s + (c.width || 1), 0);
+  const widths = columns.map((c) => (tableW * (c.width || 1)) / totalRatio);
+  const fontSize = 26;
+  const lineH = 36;
+  let y = area.top;
+  ctx.fillStyle = '#f2f1ed';
+  ctx.fillRect(PAD, y, tableW, 56);
+  ctx.font = `700 ${fontSize}px ${FONT}`;
+  ctx.textBaseline = 'middle';
+  let x = PAD;
+  columns.forEach((c, i) => {
+    ctx.fillStyle = pal.ink2;
+    ctx.textAlign = c.align === 'right' ? 'right' : 'left';
+    ctx.fillText(c.label, c.align === 'right' ? x + widths[i] - 16 : x + 16, y + 28);
+    x += widths[i];
+  });
+  y += 56;
+  const limit = area.bottom - (note ? 40 : 0);
+  let drawn = 0;
+  for (const r of rows) {
+    const cells = r.map((cell, i) => {
+      ctx.font = `${i === 0 ? 700 : 400} ${fontSize}px ${FONT}`;
+      return columns[i].wrap ? wrapText(ctx, String(cell), widths[i] - 32).slice(0, 4) : [fit(ctx, String(cell), widths[i] - 24)];
+    });
+    const h = Math.max(...cells.map((l) => l.length)) * lineH + 20;
+    if (y + h > limit) break;
+    if (drawn % 2 === 1) { ctx.fillStyle = '#f9f9f7'; ctx.fillRect(PAD, y, tableW, h); }
+    let cx = PAD;
+    cells.forEach((lines, i) => {
+      const c = columns[i];
+      ctx.font = `${i === 0 ? 700 : 400} ${fontSize}px ${FONT}`;
+      ctx.fillStyle = lines[0] === '取得できず' ? pal.muted : pal.ink;
+      ctx.textAlign = c.align === 'right' ? 'right' : 'left';
+      ctx.textBaseline = 'top';
+      lines.forEach((ln, li) => ctx.fillText(ln, c.align === 'right' ? cx + widths[i] - 16 : cx + 16, y + 12 + li * lineH));
+      cx += widths[i];
+    });
+    ctx.strokeStyle = pal.grid;
+    ctx.beginPath();
+    ctx.moveTo(PAD, y + h);
+    ctx.lineTo(PAD + tableW, y + h);
+    ctx.stroke();
+    y += h;
+    drawn += 1;
+  }
+  ctx.font = `400 22px ${FONT}`;
+  ctx.fillStyle = pal.muted;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const more = rows.length > drawn ? `（入りきらなかった ${rows.length - drawn}件は省略）` : '';
+  if (note || more) ctx.fillText(`${note || ''}${more}`, PAD, y + 26);
+  await save(canvas, filename);
+}
