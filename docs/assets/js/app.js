@@ -25,7 +25,8 @@ const ROUTES = [
 ];
 
 function parseHash() {
-  const h = decodeURI(location.hash.replace(/^#\/?/, ''));
+  let h = location.hash.replace(/^#\/?/, '');
+  try { h = decodeURI(h); } catch (e) { /* 壊れたURLでもそのまま読む */ }
   const i = h.indexOf('?');
   return { path: i >= 0 ? h.slice(0, i) : h, query: i >= 0 ? h.slice(i + 1) : '' };
 }

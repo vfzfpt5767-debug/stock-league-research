@@ -97,7 +97,7 @@ export function renderThemes(app) {
       subtitle: m.note,
       footer: exportFooter(),
       build: (cv, sc) => build(m, cv, sc, true),
-      filename: `テーマ比較_${m.id}.png`,
+      filename: `themes_${m.id}.png`,
     });
   }));
   app.querySelector('#png-table').addEventListener('click', () => {
@@ -107,7 +107,7 @@ export function renderThemes(app) {
       footer: exportFooter(),
       columns: [{ label: '指標', width: 2.6 }, ...R.map((r) => ({ label: r.short, align: 'right', width: 1 }))],
       rows: METRICS.map((m) => [m.label, ...R.map((r) => { const v = m.get(r); return C.isNum(v) ? m.fmt(v) : '取得できず'; })]),
-      filename: 'テーマ比較_表.png',
+      filename: 'themes_table.png',
     });
   });
 }

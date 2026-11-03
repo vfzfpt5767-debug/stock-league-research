@@ -177,7 +177,7 @@ export async function renderStock(app, code) {
       subtitle: `${ser[0][0].replaceAll('-', '/')}〜${ser[ser.length - 1][0].replaceAll('-', '/')}　期間中の変化 ${C.fmtPct(ser[ser.length - 1][1] / ser[0][1] - 1)}（${r.src === 'daily' ? '日足' : '週足'}の終値、配当は含まない）`,
       footer: exportFooter(),
       build: (cv, sc) => lineChart(cv, { datasets: [{ label: '株価', data: ser, color: palette(true).series[0] }], yFormat: (v) => C.fmtNum(v, 0) + '円', scale: sc, forExport: true }),
-      filename: `株価_${s.code}_${r.id}.png`,
+      filename: `price_${s.code}_${r.id}.png`,
     });
   });
 
@@ -202,13 +202,13 @@ export async function renderStock(app, code) {
     app.querySelector('#png-sales').addEventListener('click', () => exportChart({
       title: `${s.name}（${s.code}）の売上高の推移`,
       subtitle: `単位：億円　売上の成長率（3年・年平均）${C.isNum(f.sales_cagr_3y) ? C.fmtPct(f.sales_cagr_3y) : '取得できず'}`,
-      footer: exportFooter(), build: (cv, sc) => salesCfg(cv, sc, true), filename: `売上高_${s.code}.png`,
+      footer: exportFooter(), build: (cv, sc) => salesCfg(cv, sc, true), filename: `sales_${s.code}.png`,
     }));
     app.querySelector('#png-profit').addEventListener('click', () => exportChart({
       title: `${s.name}（${s.code}）の営業利益と純利益の推移`,
       subtitle: '単位：億円',
       legendItems: [{ label: '営業利益', color: palette(true).series[0], box: true }, { label: '純利益', color: palette(true).series[2], box: true }],
-      footer: exportFooter(), build: (cv, sc) => profitCfg(cv, sc, true), filename: `利益_${s.code}.png`,
+      footer: exportFooter(), build: (cv, sc) => profitCfg(cv, sc, true), filename: `profit_${s.code}.png`,
     }));
   } else {
     app.querySelector('#png-sales').disabled = true;

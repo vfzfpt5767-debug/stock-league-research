@@ -1,6 +1,6 @@
 import * as C from '../calc.js';
 import { store, esc, help, themeBadge, theme, themeColorHex, na, signed, loadPrices, loadBench, exportFooter, savedPortfolio, savePortfolio, toast, hundredCost } from '../ui.js';
-import { lineChart, barChart, palette, legendHTML } from '../charts.js';
+import { lineChart, barChart, palette, legendHTML, destroyOn } from '../charts.js';
 import { exportChart, exportTable } from '../export.js';
 
 const JPX_FACTSHEET = 'https://www.jpx.co.jp/markets/indices/factsheets/files/001_fac2_TOPIX.pdf';
@@ -213,7 +213,8 @@ export async function renderPortfolio(app, query) {
     if (benchSeries.length) ds.push({ label: '全候補の等金額平均', data: benchSeries, color: pal.muted, width: 1.5, dashed: true });
     $('#pf-line-legend').innerHTML = ds.length > 1 ? legendHTML(ds.map((d) => ({ label: d.label, color: d.color }))) + `<p class="small muted" style="margin:-4px 0 6px">「全候補の等金額平均」${help('equal_weight')}はTOPIXではありません。</p>` : '';
     const canvas = $('#pf-line');
-    if (ds.length) lineChart(canvas, { datasets: ds, yFormat: (v) => C.fmtNum(v, 0), tooltipFormat: (v) => C.fmtNum(v, 1) });
+    if (bt.series.length) lineChart(canvas, { datasets: ds, yFormat: (v) => C.fmtNum(v, 0), tooltipFormat: (v) => C.fmtNum(v, 1) });
+    else destroyOn(canvas); // 銘柄がないときは前のグラフを消す
     $('#pf-excluded').textContent = bt.excluded.length
       ? `※ ${bt.excluded.map((c) => store.byCode[c]?.name || c).join('、')} は、この期間の最初の株価がない（上場が新しい等）ため、グラフと数字の計算から外しています。`
       : (held.length ? '' : '銘柄を追加すると、ここに過去の値動きが表示されます。');
@@ -393,7 +394,7 @@ export async function renderPortfolio(app, query) {
       legendItems: ds.map((d) => ({ label: d.label, color: d.color })),
       footer: exportFooter(),
       build: (cv, sc) => lineChart(cv, { datasets: ds, yFormat: (v) => C.fmtNum(v, 0), scale: sc, forExport: true }),
-      filename: `ポートフォリオ_推移_${period}.png`,
+      filename: `portfolio_history_${period}.png`,
     });
   });
   $('#png-cmp').addEventListener('click', () => {
@@ -403,7 +404,7 @@ export async function renderPortfolio(app, query) {
       subtitle: `ポートフォリオと等金額平均は株価のみ。TOPIXはJPX公表の配当込みの値（${st.topix.td || '基準日未入力'}）を入力したもの`,
       footer: `${exportFooter()}｜TOPIX：JPX「TOPIX ファクトシート」より入力`,
       build: (cv, sc) => drawCmp(cv, sc, true),
-      filename: `ポートフォリオ_比較_${period}.png`,
+      filename: `portfolio_compare_${period}.png`,
     });
   });
   $('#png-stats').addEventListener('click', () => {
@@ -421,7 +422,7 @@ export async function renderPortfolio(app, query) {
         ['最大下落率', f(a.pfStats.mdd, 'mdd'), f(a.bStats.mdd, 'mdd'), f(a.topix.mdd, 'mdd')],
       ],
       note: 'ポートフォリオ・等金額平均は株価のみ（配当なし）、週の終値。TOPIXはJPXファクトシートの配当込みの値を入力。',
-      filename: `ポートフォリオ_数字_${period}.png`,
+      filename: `portfolio_stats_${period}.png`,
     });
   });
   $('#png-ind').addEventListener('click', () => {
@@ -432,7 +433,7 @@ export async function renderPortfolio(app, query) {
       subtitle: `株を買う金額に占める割合（${plan().count}銘柄）`,
       footer: exportFooter(),
       build: (cv, sc) => barChart(cv, { labels: a.ind.map(([k]) => k), groups: [{ label: '割合', values: a.ind.map(([, v]) => (v / a.total) * 100), color: palette(true).series[0] }], format: (v) => `${C.fmtNum(v, 1)}%`, horizontal: true, scale: sc, forExport: true, valueLabels: true }),
-      filename: 'ポートフォリオ_業種.png',
+      filename: 'portfolio_industry.png',
     });
   });
 

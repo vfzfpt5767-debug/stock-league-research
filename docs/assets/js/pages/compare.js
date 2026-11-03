@@ -236,7 +236,7 @@ export function renderCompare(app, query) {
       columns: cols.map((c) => ({ label: c.label, align: c.num ? 'right' : 'left', width: c.id === 'name' ? 2.4 : 1 })),
       rows: rows.map((s) => cols.map((c) => (c.png ? c.png(s) : C.isNum(c.value(s)) ? c.fmt(c.value(s)) : '取得できず'))),
       note: '「取得できず」はデータ元から取得できなかった値。騰落率は配当を含まない。',
-      filename: `比較表_${store.meta.data_date || ''}.png`,
+      filename: `compare_${store.meta.data_date || ''}.png`,
     });
   });
 
@@ -251,7 +251,7 @@ export function renderCompare(app, query) {
       if (['return_1m', 'return_6m', 'return_1y', 'return_3y', 'vol_1y', 'mdd_3y', 'sales_cagr_3y', 'op_margin'].includes(c.id)) return (v * 100).toFixed(2);
       return v;
     };
-    downloadCSV(`比較表_${store.meta.data_date || ''}.csv`, header, rows.map((s) => [s.code, ...cols.map((c) => raw(c, s))]));
+    downloadCSV(`compare_${store.meta.data_date || ''}.csv`, header, rows.map((s) => [s.code, ...cols.map((c) => raw(c, s))]));
   });
 }
 
