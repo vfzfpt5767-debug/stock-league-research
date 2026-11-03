@@ -20,8 +20,8 @@ def make_client(tmp_path, responses, **kw):
     c = PoliteClient(cache_dir=tmp_path, min_interval=0, **kw)
     calls = []
 
-    def fake_get(url, timeout):
-        calls.append(url)
+    def fake_get(url, timeout, params=None):
+        calls.append((url, params) if params else url)
         return responses.pop(0)
 
     c.session.get = fake_get
@@ -67,4 +67,15 @@ def test_403_stops_all_access_to_site(tmp_path):
         c.get("https://example.org/one")
     with pytest.raises(SiteRestricted):
         c.get("https://example.org/two")
+    assert len(calls) == 1
+
+
+def test_secret_params_are_sent_but_not_stored(tmp_path):
+    c, calls = make_client(tmp_path, [FakeResp(body=b"ok")])
+    assert c.get("https://api.example.org/x?date=2026-01-05", secret_params={"Subscription-Key": "SECRET123"}) == b"ok"
+    assert calls == [("https://api.example.org/x?date=2026-01-05", {"Subscription-Key": "SECRET123"})]
+    stored = "".join(p.read_text(errors="ignore") for p in tmp_path.glob("*.json"))
+    assert "SECRET123" not in stored
+    # 2回目はキャッシュから（キーなしのURLで見つかる）
+    assert c.get("https://api.example.org/x?date=2026-01-05", secret_params={"Subscription-Key": "SECRET123"}) == b"ok"
     assert len(calls) == 1

@@ -92,8 +92,11 @@ class PoliteClient:
         p.write_bytes(body)
         p.with_suffix(".json").write_text(json.dumps({"url": url, "fetched": time.time()}))
 
-    def get(self, url: str, ttl: float | None = 6 * 3600) -> bytes:
-        """URL を取得して本文（bytes）を返す。ttl 秒以内のキャッシュがあればそれを使う。"""
+    def get(self, url: str, ttl: float | None = 6 * 3600, secret_params: dict | None = None) -> bytes:
+        """URL を取得して本文（bytes）を返す。ttl 秒以内のキャッシュがあればそれを使う。
+
+        secret_params（APIキーなど）は送信時だけ付け、キャッシュのファイル名・記録・エラー文には含めない。
+        """
         cached = self._read_cache(url, ttl)
         if cached is not None:
             return cached
@@ -112,7 +115,10 @@ class PoliteClient:
         for attempt in range(3):
             self.count += 1
             try:
-                r = self.session.get(url, timeout=self.timeout)
+                if secret_params:
+                    r = self.session.get(url, params=secret_params, timeout=self.timeout)
+                else:
+                    r = self.session.get(url, timeout=self.timeout)
                 self._last[key] = time.time()
                 if r.status_code in (429, 500, 502, 503, 504):
                     last_err = RuntimeError(f"HTTP {r.status_code} for {url}")
@@ -135,7 +141,10 @@ class PoliteClient:
                 self._last[key] = time.time()
                 last_err = e
                 time.sleep(interval * (attempt + 2))
-        raise RuntimeError(f"failed to fetch {url}: {last_err}")
+        msg = str(last_err)
+        for v in (secret_params or {}).values():
+            msg = msg.replace(str(v), "***")  # 秘密の値をエラー文に残さない
+        raise RuntimeError(f"failed to fetch {url}: {msg}")
 
     def get_text(self, url: str, ttl: float | None = 6 * 3600, encoding: str = "utf-8") -> str:
         return self.get(url, ttl).decode(encoding, errors="replace")
