@@ -88,21 +88,34 @@ def parse_price_rows(soup: BeautifulSoup) -> list[dict]:
     table = soup.select_one("#tbc")
     if table is None:
         return rows
+    year = None
     for tr in table.select("tbody tr"):
         tds = tr.find_all("td")
+        if len(tds) == 1:
+            # 年の区切り行（例: 2026）
+            ym = re.fullmatch(r"(\d{4})", tds[0].get_text("", strip=True))
+            if ym:
+                year = ym.group(1)
+            continue
         if len(tds) < 7:
             continue
         a = tds[0].find("a")
         href = a.get("href", "") if a else ""
         m = re.search(r"y=(\d{4}-\d{2}-\d{2})", href)
-        if not m:
-            continue
+        if m:
+            d = m.group(1)
+        else:
+            # 上場が新しい銘柄などはリンクがないので「年の区切り＋MM/DD」から日付を作る
+            md = re.fullmatch(r"(\d{2})/(\d{2})", tds[0].get_text("", strip=True))
+            if not (md and year):
+                continue
+            d = f"{year}-{md.group(1)}-{md.group(2)}"
         close = to_float(tds[4].get_text("", strip=True))
         if close is None:
             continue
         rows.append(
             {
-                "date": m.group(1),
+                "date": d,
                 "open": to_float(tds[1].get_text("", strip=True)),
                 "high": to_float(tds[2].get_text("", strip=True)),
                 "low": to_float(tds[3].get_text("", strip=True)),

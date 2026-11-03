@@ -152,7 +152,8 @@ export function barChart(canvas, { labels, groups, format = (v) => v, horizontal
     grid: { color: pal.grid },
     border: { display: false },
     ticks: { color: pal.muted, font: axisFont(scale), callback: (v) => format(v), maxTicksLimit: 6 },
-    grace: '8%',
+    // 数値ラベルを棒の先に書くときは、ラベルが軸の文字と重ならないように余白を広くとる
+    grace: valueLabels && horizontal ? '28%' : '8%',
   };
   const catAxis = {
     grid: { display: false },
@@ -175,9 +176,16 @@ export function barChart(canvas, { labels, groups, format = (v) => v, horizontal
             if (v === null || v === undefined) return;
             const txt = format(v);
             if (horizontal) {
-              ctx.textAlign = v >= 0 ? 'left' : 'right';
               ctx.textBaseline = 'middle';
-              ctx.fillText(txt, el.x + (v >= 0 ? 6 : -6) * scale, el.y);
+              const w = ctx.measureText(txt).width;
+              if (v < 0 && el.x - 6 * scale - w < chart.chartArea.left) {
+                // 短いマイナスの棒は、ラベルを0の線の右側に書く（軸の文字と重ねない）
+                ctx.textAlign = 'left';
+                ctx.fillText(txt, el.base + 6 * scale, el.y);
+              } else {
+                ctx.textAlign = v >= 0 ? 'left' : 'right';
+                ctx.fillText(txt, el.x + (v >= 0 ? 6 : -6) * scale, el.y);
+              }
             } else {
               ctx.textAlign = 'center';
               ctx.textBaseline = v >= 0 ? 'bottom' : 'top';

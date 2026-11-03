@@ -124,6 +124,7 @@ export async function renderStock(app, code) {
           <thead><tr><th>決算期</th><th class="r">売上高</th><th class="r">営業利益</th><th class="r">純利益</th><th class="r">EPS</th><th class="r">1株配当</th></tr></thead>
           <tbody>${s.fin_history.map((h) => `<tr><td>${esc(h.fy)}</td><td class="r">${cell(h.sales, C.fmtJpAmount)}</td><td class="r">${cell(h.operating_income, C.fmtJpAmount)}</td><td class="r">${cell(h.net_income, C.fmtJpAmount)}</td><td class="r">${cell(h.eps, (v) => C.fmtNum(v, 2) + '円')}</td><td class="r">${cell(h.dps, (v) => C.fmtNum(v, 1) + '円')}</td></tr>`).join('')}</tbody>
         </table></div>
+        <p class="small muted" style="margin-top:6px">EPS・1株配当は各年度の決算時点の株数での値です。そのあとに株式分割をした会社（例：2026年10月に東京エレクトロンは1株→5株、キオクシアは1株→3株）は、今の株価と比べるときに分割の分だけ割って考えてください。株価のグラフと騰落率は分割を調整済みです。</p>
       </details>
       <p class="small muted" style="margin-top:8px">売上の成長率（3年・年平均）${help('sales_cagr_3y')}：${C.isNum(f.sales_cagr_3y) ? C.fmtPct(f.sales_cagr_3y) : '取得できず'}　／　営業利益率${help('op_margin')}：${C.isNum(f.op_margin) ? C.fmtPct(f.op_margin, { sign: false }) : '取得できず'}。出典：IR BANK（有価証券報告書のデータ）。会社によっては経常利益などが空欄です。</p>`
       : `<p>${na()}（決算データを取得できませんでした）</p>`}
