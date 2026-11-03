@@ -77,6 +77,12 @@ class Builder:
         )
         self.warnings: list[str] = []
         self.history_fetches = 0
+        # これより後に更新済みなら取り直さない（日本時間17時。IR BANKは前営業日の終値を表示）
+        n = now_jst()
+        b = n.replace(hour=17, minute=0, second=0, microsecond=0)
+        if n < b:
+            b -= timedelta(days=1)
+        self.fresh_boundary = b.isoformat(timespec="minutes")
 
     def log(self, *a):
         print(*a, flush=True)
@@ -157,8 +163,8 @@ class Builder:
         cur = read_json(path, {"code": code, "daily": [], "weekly": [], "monthly": [], "header": {}})
         if self.args.offline:
             return
-        if cur.get("updated") == self.today.isoformat() and not self.args.force:
-            return
+        if not self.args.force and cur.get("updated_at", "") >= self.fresh_boundary:
+            return  # 直近の夕方（17時）以降にすでに更新済み
         page = irbank.parse_chart_page(self.client.get_text(irbank.chart_url(code), ttl=3 * 3600))
         daily_new = _pairs(page["rows"])
         if not daily_new:
@@ -196,6 +202,7 @@ class Builder:
             "code": code,
             "name_irbank": page.get("name"),
             "updated": self.today.isoformat(),
+            "updated_at": now_jst().isoformat(timespec="minutes"),
             "header": page["header"],
             "daily": [list(p) for p in daily],
             "weekly": [list(p) for p in weekly],

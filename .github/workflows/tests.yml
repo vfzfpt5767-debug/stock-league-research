@@ -1,0 +1,49 @@
+# テスト：プログラムや CSV を変更したときに、壊れていないかを自動で確かめる
+name: テスト
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Python の部品を入れる
+        run: pip install -r requirements.txt
+
+      - name: Python のテスト（CSVの書き方チェックを含む）
+        run: python -m pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 画面の計算のテスト
+        run: node --test tests/js/*.test.mjs
+
+      - name: ブラウザで全ページを開くテスト
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.49.1
+          npx playwright install --with-deps chromium
+          node tests/e2e/smoke.mjs .cache/screens
+
+      - name: スクリーンショットを保存（失敗したとき確認用）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: .cache/screens
+          retention-days: 7

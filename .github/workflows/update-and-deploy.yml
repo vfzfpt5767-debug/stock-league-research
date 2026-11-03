@@ -1,0 +1,95 @@
+# データの自動更新と公開
+# - 平日の夕方（日本時間 18:37ごろ）に株価・指標を取り直して docs/data に保存し、GitHub Pages に公開する
+# - main ブランチに変更が入ったとき（CSVの編集など）も、データを作り直して公開する
+# - 「Actions」タブの「Run workflow」ボタンで手動でも実行できる
+name: データ更新と公開
+
+on:
+  schedule:
+    - cron: "37 9 * * 1-5"   # UTC 9:37 = 日本時間 18:37（月〜金）
+  push:
+    branches: [main]
+    paths:
+      - "config/**"
+      - "slr/**"
+      - "docs/**"
+      - "!docs/data/**"
+      - ".github/workflows/update-and-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "今日すでに更新済みでも取り直す"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update-and-deploy
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Python の部品を入れる
+        run: pip install -r requirements.txt
+
+      - name: テスト（CSVの書き方チェックを含む）
+        run: python -m pytest -q
+
+      # 取得したファイルを次回も使えるように保存（相手サイトへのアクセスを減らすため）
+      - name: 取得キャッシュを復元
+        uses: actions/cache@v4
+        with:
+          path: .cache/http
+          key: http-cache-${{ github.run_id }}
+          restore-keys: http-cache-
+
+      - name: データを集める
+        run: |
+          python -m slr.build --max-requests 450 --max-history-fetch 30 --max-event-fetch 30 ${{ inputs.force && '--force' || '' }}
+
+      - name: 変わったデータを保存（コミット）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data
+          if git diff --cached --quiet; then
+            echo "データに変更はありません"
+          else
+            git commit -m "データ更新 $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M') JST"
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push origin HEAD:main && break
+              sleep 5
+            done
+          fi
+
+      - name: 公開用のファイルをまとめる
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: update
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: GitHub Pages に公開
+        id: deployment
+        uses: actions/deploy-pages@v4

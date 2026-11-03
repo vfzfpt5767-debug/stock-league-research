@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="日経STOCKリーグに向けた、テーマ別の銘柄リサーチ用ページ（学習用）">
+<meta name="color-scheme" content="light dark">
+<title>テーマ別 銘柄リサーチ</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M7 22l6-7 5 4 7-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/style.css">
+<script>
+  // 保存されている表示モード（ライト／ダーク）を、描画前に反映してちらつきを防ぐ
+  try { var m = localStorage.getItem('slr-theme'); if (m === 'light' || m === 'dark') document.documentElement.setAttribute('data-theme', m); } catch (e) {}
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand-row">
+      <a class="brand" href="#/">テーマ別 銘柄リサーチ<small>日経STOCKリーグ 第27回 用</small></a>
+      <button id="theme-toggle" class="theme-toggle" type="button">表示: 自動</button>
+    </div>
+    <nav class="nav" aria-label="ページ">
+      <a href="#/" data-nav="">ホーム</a>
+      <a href="#/themes" data-nav="themes">テーマ比較</a>
+      <a href="#/compare" data-nav="compare">銘柄の比較表</a>
+      <a href="#/portfolio" data-nav="portfolio">ポートフォリオ試算</a>
+      <a href="#/news" data-nav="news">ニュース</a>
+      <a href="#/rules" data-nav="rules">ルール</a>
+      <a href="#/glossary" data-nav="glossary">用語集</a>
+      <a href="#/about" data-nav="about">データについて</a>
+    </nav>
+  </div>
+</header>
+<main id="app" tabindex="-1">
+  <div class="loading">読み込み中…</div>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <p class="disclaimer">このページは学習目的の資料であり、投資の助言ではありません。特定の銘柄の売買を勧めるものではありません。</p>
+    <p>数字は公開情報を自動で集めたもので、誤りや遅れを含むことがあります。取得できなかった数字は「取得できず」と表示し、推測では埋めていません。レポートに使うときは、会社の公式資料などで確認し、出典を書いてください。</p>
+    <p id="data-date" class="muted"></p>
+    <p>出典：<a href="https://irbank.net/" rel="noopener">IR BANK</a>（株価・時価総額・PER・PBR・配当利回り・決算・適時開示）／ <a href="https://disclosure2dl.edinet-fsa.go.jp/guide/static/disclosure/WZEK0030.html" rel="noopener">金融庁 EDINET</a>（業種・決算日、公共データ利用規約 PDL1.0、加工して利用）／ <a href="https://manabow.com/sl/" rel="noopener">日経STOCKリーグ公式（man@bow）</a>（ルールの要約）。くわしくは<a href="#/about">データについて</a>。</p>
+  </div>
+</footer>
+<script src="assets/vendor/chart.umd.min.js"></script>
+<script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
