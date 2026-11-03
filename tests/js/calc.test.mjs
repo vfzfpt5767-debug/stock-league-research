@@ -40,10 +40,13 @@ test('予算オーバーの警告', () => {
 });
 
 test('URLへの保存と読み込みが往復する', () => {
-  const st = { items: [{ code: '7203', amount: 500000 }, { code: '285A', amount: 300000 }], lot: 1, topix: { t1: 12.34, t3: 45.67, m3: -21.09, td: '2026-09-30' }, name: 'A案' };
+  const st = { items: [{ code: '7203', amount: 500000 }, { code: '285A', amount: 300000 }], prices: { 7203: 3040, '285A': 9876.5 }, pastPrices: { 7203: 2800 }, pastDate: '2025-11-04', lot: 1, topix: { tp: 15.5 }, name: 'A案' };
   const q = C.encodePortfolio(st);
   const back = C.decodePortfolio(q);
   assert.deepEqual(back.items, st.items);
+  assert.deepEqual(back.prices, { 7203: 3040, '285A': 9876.5 });
+  assert.deepEqual(back.pastPrices, { 7203: 2800 });
+  assert.equal(back.pastDate, '2025-11-04');
   assert.equal(back.lot, 1);
   assert.deepEqual(back.topix, st.topix);
   assert.equal(back.name, 'A案');
@@ -100,4 +103,19 @@ test('期間の最初は「ちょうどその日に最も近い」値を使う',
   assert.deepEqual(C.closeNearest(s, '2025-11-02', 10), ['2025-10-31', 100]);
   assert.deepEqual(C.closeNearest(s, '2025-11-05', 10), ['2025-11-07', 110]);
   assert.equal(C.closeNearest(s, '2026-01-01', 10), null);
+});
+
+test('過去と比べる：今の金額の割合で過去に買っていたら', () => {
+  const rows = [{ code: 'A', cost: 300, price: 120 }, { code: 'B', cost: 100, price: 50 }, { code: 'C', cost: 100, price: 10 }];
+  const r = C.pastReturn(rows, { A: 100, B: 100 });
+  // A: 3/4 × 1.2 + B: 1/4 × 0.5 = 1.025（Cは過去の株価がないので除く）
+  assert.ok(Math.abs(r.ret - 0.025) < 1e-12);
+  assert.deepEqual(r.used, ['A', 'B']);
+  assert.equal(C.pastReturn(rows, {}).ret, null);
+});
+
+test('加重平均はデータのないものを除く', () => {
+  const w = C.weightedAverage([[3, 0.1], [1, null], [1, 0.3]]);
+  assert.ok(Math.abs(w.value - 0.15) < 1e-12);
+  assert.equal(w.coverage, 4);
 });

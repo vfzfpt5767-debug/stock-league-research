@@ -3,15 +3,7 @@ import * as C from './calc.js';
 import { GLOSSARY } from './glossary.js';
 import { palette } from './charts.js';
 
-export const store = {
-  meta: null,
-  stocks: [],
-  byCode: {},
-  themeSummary: {},
-  prices: {},
-  bench: undefined,
-  news: undefined,
-};
+export const store = { meta: null, stocks: [], byCode: {}, themeSummary: {} };
 
 export async function loadJSON(path) {
   const r = await fetch(`data/${path}`, { cache: 'no-cache' });
@@ -28,28 +20,33 @@ export async function loadCore() {
   store.themes = meta.themes.filter((t) => t.enabled);
   store.themeIndex = Object.fromEntries(meta.themes.map((t, i) => [t.id, i]));
   store.rules = meta.rules;
+  store.hasFin = stocks.some((s) => (s.fin_history || []).length);
 }
 
-export async function loadPrices(code) {
-  if (store.prices[code]) return store.prices[code];
-  try {
-    store.prices[code] = await loadJSON(`prices/${code}.json`);
-  } catch (e) {
-    store.prices[code] = { code, daily: [], weekly: [] };
-  }
-  return store.prices[code];
+// ---------- 株価メモ（自分で調べた株価を、この端末のブラウザにだけ保存） ----------
+// 株価などの市場データは、規約上このサイトで自動取得・公開できないため、利用者が入力する方式にしている。
+const MEMO_KEY = 'slr-price-memo';
+export function priceMemo() {
+  try { return JSON.parse(localStorage.getItem(MEMO_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+export function memoPrice(code) {
+  const m = priceMemo()[code];
+  return m && C.isNum(m.price) ? m : null;
+}
+export function setMemoPrice(code, price, date) {
+  const all = priceMemo();
+  if (C.isNum(price) && price > 0) all[code] = { price, date: date || new Date().toISOString().slice(0, 10) };
+  else delete all[code];
+  try { localStorage.setItem(MEMO_KEY, JSON.stringify(all)); } catch (e) { /* 保存できなくても動く */ }
 }
 
-export async function loadBench() {
-  if (store.bench !== undefined) return store.bench;
-  try { store.bench = await loadJSON('benchmark.json'); } catch (e) { store.bench = null; }
-  return store.bench;
-}
-
-export async function loadNews() {
-  if (store.news !== undefined) return store.news;
-  try { store.news = await loadJSON('news.json'); } catch (e) { store.news = { themes: {} }; }
-  return store.news;
+// ---------- 外部サイトへのリンク（データは取りにいかず、リンクするだけ） ----------
+export function extLinks(code) {
+  return [
+    { label: 'Yahoo!ファイナンス', url: `https://finance.yahoo.co.jp/quote/${code}.T` },
+    { label: '株探', url: `https://kabutan.jp/stock/?code=${code}` },
+    { label: 'IR BANK', url: `https://irbank.net/${code}` },
+  ];
 }
 
 // ---------- HTML ----------
@@ -57,8 +54,8 @@ export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-export function na() {
-  return '<span class="na" title="データを取得できませんでした（推測で埋めていません）">取得できず</span>';
+export function na(text = '取得できず') {
+  return `<span class="na" title="データがありません（推測で埋めていません）">${text}</span>`;
 }
 
 export function help(key) {
@@ -87,11 +84,6 @@ export function themeBadge(id, { link = true, short = true } = {}) {
   return link ? `<a class="badge" href="#/theme/${id}">${inner}</a>` : `<span class="badge">${inner}</span>`;
 }
 
-export function stockLink(s) {
-  return `<a href="#/stock/${esc(s.code)}">${esc(s.name)}</a><span class="code">${esc(s.code)}</span>`;
-}
-
-// 数値セル（値がなければ「取得できず」）
 export function cell(v, fmt) {
   return C.isNum(v) ? `<span class="num">${fmt(v)}</span>` : na();
 }
@@ -104,19 +96,14 @@ export function signed(v, { digits = 1 } = {}) {
   return `<span class="num ${cls}">${mark}${C.fmtPct(v, { digits })}</span>`;
 }
 
-export function perCell(s) {
-  if (!C.isNum(s.per)) return na();
-  return `<span class="num">${C.fmtTimes(s.per)}${s.per_forecast ? '<small class="muted">（予）</small>' : ''}</span>`;
+export function finNote() {
+  return store.hasFin
+    ? `決算の数字は金融庁 EDINET の有価証券報告書から（最新：${esc(store.meta.fin_latest_fy || '—')}期）。`
+    : '決算の数字（売上・利益・配当・株主総利回り）は、EDINET の APIキーを登録すると自動で表示されます（<a href="#/about">データについて</a>）。';
 }
 
-export function yieldCell(s) {
-  if (!C.isNum(s.dividend_yield)) return na();
-  return `<span class="num">${C.fmtPctRaw(s.dividend_yield)}${s.dividend_forecast ? '<small class="muted">（予）</small>' : ''}</span>`;
-}
-
-export function exportFooter() {
-  const d = store.meta?.data_date ? store.meta.data_date.replaceAll('-', '/') : '—';
-  return `出典：IR BANK（株価・指標・決算）、金融庁EDINET（業種）｜データ：${d}時点（前営業日終値）｜作成：テーマ別 銘柄リサーチ｜学習目的の資料であり、投資の助言ではありません`;
+export function exportFooter(extra = '') {
+  return `出典：金融庁 EDINET（業種・決算・株主総利回り。加工して作成）／テーマとの関係は各銘柄ページの出典を参照${extra}｜作成：テーマ別 銘柄リサーチ｜学習目的の資料であり、投資の助言ではありません`;
 }
 
 export function toast(msg) {
@@ -156,7 +143,7 @@ export function initHelp() {
     const r = b.getBoundingClientRect();
     const pw = pop.offsetWidth;
     const ph = pop.offsetHeight;
-    let left = Math.min(Math.max(16, r.left - pw / 2 + r.width / 2), window.innerWidth - pw - 16);
+    const left = Math.min(Math.max(16, r.left - pw / 2 + r.width / 2), window.innerWidth - pw - 16);
     let top = r.bottom + 8;
     if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 8);
     pop.style.left = `${left}px`;
@@ -190,8 +177,4 @@ export function downloadCSV(filename, header, rows) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
-}
-
-export function hundredCost(s) {
-  return C.isNum(s.price) ? s.price * 100 : null;
 }

@@ -1,43 +1,7 @@
 import * as C from '../calc.js';
-import { store, esc, help, themeBadge, theme, signed, na, cell, perCell, yieldCell, loadPrices, loadJSON, exportFooter, savedPortfolio, savePortfolio, toast } from '../ui.js';
-import { lineChart, barChart, palette, legendHTML } from '../charts.js';
+import { store, esc, help, themeBadge, na, cell, exportFooter, savedPortfolio, savePortfolio, toast, extLinks, memoPrice, setMemoPrice, finNote } from '../ui.js';
+import { barChart, palette, legendHTML } from '../charts.js';
 import { exportChart } from '../export.js';
-
-let eventsCache = null;
-async function loadEvents() {
-  if (eventsCache) return eventsCache;
-  try { eventsCache = (await loadJSON('events.json')).data || {}; } catch (e) { eventsCache = {}; }
-  return eventsCache;
-}
-
-const RANGES = [
-  { id: '6m', label: '6か月', days: 182, src: 'daily' },
-  { id: '1y', label: '1年', days: 365, src: 'daily' },
-  { id: '3y', label: '3年', days: 365 * 3, src: 'weekly' },
-  { id: 'all', label: '全期間', days: null, src: 'weekly' },
-];
-
-function priceSeries(p, range) {
-  const r = RANGES.find((x) => x.id === range) || RANGES[2];
-  let s = r.src === 'daily' ? (p.daily || []) : (p.weekly || []);
-  if (r.src === 'daily' && s.length && r.days && C.daysBetween(s[0][0], s[s.length - 1][0]) < r.days - 20) {
-    // 日足が足りなければ週足を使う
-    s = p.weekly || [];
-  }
-  if (r.src === 'weekly' && p.daily?.length) {
-    // 週足の最後に最新の日足をつなぐ
-    const last = p.daily[p.daily.length - 1];
-    if (!s.length || s[s.length - 1][0] < last[0]) s = [...s, last];
-  }
-  if (!s.length) return [];
-  if (r.days) {
-    // 騰落率の計算と同じく「ちょうど期間前に最も近い終値」から表示する
-    const start = C.addDays(s[s.length - 1][0], -r.days);
-    const near = C.closeNearest(s, start, 10);
-    s = near ? s.filter(([d]) => d >= near[0]) : s.filter(([d]) => d >= start);
-  }
-  return s;
-}
 
 export async function renderStock(app, code) {
   const s = store.byCode[code];
@@ -47,6 +11,8 @@ export async function renderStock(app, code) {
   }
   document.title = `${s.name}（${s.code}）｜テーマ別 銘柄リサーチ`;
   const f = s.fin || {};
+  const hist = s.fin_history || [];
+  const memo = memoPrice(s.code);
   const tile = (label, key, value, sub = '') => `<div class="tile"><div class="label">${label}${key ? help(key) : ''}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
 
   app.innerHTML = `
@@ -58,172 +24,130 @@ export async function renderStock(app, code) {
         ${s.fiscal_year_end ? `<span class="badge">決算日：${esc(s.fiscal_year_end)}</span>` : ''}</div>
       <div class="row" style="margin-top:10px">
         <button type="button" class="btn primary" id="add-pf">ポートフォリオ試算に追加</button>
-        <a class="btn" href="https://irbank.net/${esc(s.code)}/chart" rel="noopener">IR BANK（株価）</a>
-        <a class="btn" href="https://irbank.net/${esc(s.code)}" rel="noopener">IR BANK（会社情報）</a>
       </div>
     </div>
 
-    <section class="card">
-      <h2 style="margin-top:0">主な数字 <small class="muted" style="font-weight:400">${s.price_date ? s.price_date.replaceAll('-', '/') + ' 時点' : ''}</small></h2>
-      <div class="tiles">
-        ${tile('株価', 'price', cell(s.price, (v) => C.fmtYen(v)), C.isNum(s.price) ? `100株で ${C.fmtJpAmount(s.price * 100)}` : '')}
-        ${tile('時価総額', 'market_cap', cell(s.market_cap, C.fmtJpAmount))}
-        ${tile('PER', 'per', perCell(s))}
-        ${tile('PBR', 'pbr', cell(s.pbr, (v) => C.fmtTimes(v, 2)))}
-        ${tile('配当利回り', 'dividend_yield', yieldCell(s))}
-        ${tile('ROE', 'roe', cell(s.roe, (v) => C.fmtPctRaw(v, 1)))}
-        ${tile('1年の騰落率', 'return_1y', signed(s.return_1y))}
-        ${tile('3年の騰落率', 'return_3y', signed(s.return_3y))}
-        ${tile('値動きの大きさ', 'vol', C.isNum(s.vol_1y) ? C.fmtPct(s.vol_1y, { sign: false }) : na(), '1年・年率')}
-        ${tile('最大下落率', 'mdd', C.isNum(s.mdd_3y) ? C.fmtPct(s.mdd_3y) : na(), '過去3年・週足')}
-      </div>
-    </section>
-
-    <div class="grid grid-2" style="margin-top:16px">
+    <div class="grid grid-2">
+      <section class="card">
+        <h2 style="margin-top:0">株価・チャートを見る</h2>
+        <p class="small">株価やチャートは、次の外部サイトや STOCKリーグのバーチャル投資システムで確認してください（このサイトは株価データを自動では集めていません）。</p>
+        <div class="row">${extLinks(s.code).map((l) => `<a class="btn small" href="${esc(l.url)}" rel="noopener" target="_blank">${esc(l.label)} ↗</a>`).join('')}</div>
+        <h3>株価メモ ${help('price_memo')}</h3>
+        <div class="row">
+          <label>株価（円）<br><input id="memo-price" type="number" inputmode="decimal" min="0" step="1" value="${memo ? memo.price : ''}" style="width:9em"></label>
+          <label>調べた日<br><input id="memo-date" type="text" placeholder="2026-11-04" value="${memo ? esc(memo.date) : ''}" style="width:9em"></label>
+          <button type="button" class="btn" id="memo-save" style="align-self:flex-end">保存</button>
+        </div>
+        <p class="small muted" id="memo-note">${memo ? `100株で ${C.fmtJpAmount(memo.price * 100)}（手数料は別）` : '入力すると比較表とポートフォリオ試算で使えます。この端末のブラウザだけに保存されます。'}</p>
+      </section>
       <section class="card">
         <h2 style="margin-top:0">テーマとの関係</h2>
         ${s.themes.map((t) => {
           const r = s.reasons[t];
           return `<div style="margin-bottom:12px">${themeBadge(t, { short: false })}<p style="margin:6px 0 2px">${esc(r.reason)}</p><div class="small">出典：<a href="${esc(r.source_url)}" rel="noopener">${esc(r.source_title || r.source_url)}</a></div></div>`;
         }).join('')}
-      </section>
-      <section class="card">
-        <h2 style="margin-top:0">事業の説明</h2>
+        <h3>事業の説明</h3>
         <p>${s.business ? esc(s.business) : na()}</p>
-        <p class="small muted">公開情報をもとにした短い要約です。くわしくは会社の公式サイト・統合報告書や、上のIR BANKのページ（会社情報）で確認してください。</p>
+        <p class="small muted">公開情報をもとにした短い要約です。くわしくは会社の公式サイト・統合報告書・有価証券報告書で確認してください。</p>
       </section>
     </div>
 
     <section class="card" style="margin-top:16px">
-      <div class="chart-head">
-        <h2 style="margin:0">株価チャート</h2>
-        <div class="row">
-          <div class="seg" role="group" aria-label="期間">${RANGES.map((r) => `<button type="button" data-range="${r.id}" aria-pressed="${r.id === '3y'}">${r.label}</button>`).join('')}</div>
-          <button type="button" class="btn small" id="png-price">PNGで保存</button>
-        </div>
+      <h2 style="margin-top:0">決算の数字（有価証券報告書より）</h2>
+      ${hist.length ? `
+      <div class="tiles">
+        ${tile('売上高', 'sales', cell(f.sales, C.fmtJpAmount), esc(f.fy || ''))}
+        ${tile('純利益', 'net_income', cell(f.net_income, C.fmtJpAmount))}
+        ${tile('売上の成長率', 'sales_cagr_3y', C.isNum(f.sales_cagr_3y) ? C.fmtPct(f.sales_cagr_3y) : na(), '3年の年平均')}
+        ${tile('ROE', 'roe', cell(f.roe_actual, (v) => C.fmtPctRaw(v, 1)))}
+        ${tile('自己資本比率', 'equity_ratio', cell(f.equity_ratio, (v) => C.fmtPctRaw(v, 1)))}
+        ${tile('1株配当', 'dps', cell(f.dps, (v) => C.fmtNum(v, 1) + '円'))}
+        ${tile('PER（期末）', 'per', cell(f.per_fy_end, (v) => C.fmtTimes(v)), '決算期末の株価で計算')}
       </div>
-      <p id="price-note" class="small muted" style="margin:0 0 6px"></p>
-      <div class="chart-box tall"><canvas id="price-chart" aria-label="${esc(s.name)}の株価の推移" role="img"></canvas></div>
-    </section>
-
-    <section class="card">
-      <div class="chart-head">
-        <h2 style="margin:0">業績の推移（決算期ごと）</h2>
-        <div class="row">
-          <button type="button" class="btn small" id="png-sales">売上をPNG</button>
-          <button type="button" class="btn small" id="png-profit">利益をPNG</button>
-        </div>
-      </div>
-      ${(s.fin_history || []).length ? `
+      <div class="chart-head" style="margin-top:14px"><h3 style="margin:0">売上高と純利益の推移</h3>
+        <div class="row"><button type="button" class="btn small" id="png-sales">売上をPNG</button><button type="button" class="btn small" id="png-profit">純利益をPNG</button></div></div>
       <div class="grid grid-2">
-        <div><h3 style="margin-top:0">売上高 ${help('sales')}</h3><div class="chart-box short"><canvas id="sales-chart" role="img" aria-label="売上高の推移"></canvas></div></div>
-        <div><h3 style="margin-top:0">営業利益と純利益 ${help('operating_income')}</h3><div id="profit-legend"></div><div class="chart-box short"><canvas id="profit-chart" role="img" aria-label="営業利益と純利益の推移"></canvas></div></div>
+        <div><div class="chart-box short"><canvas id="sales-chart" role="img" aria-label="売上高の推移"></canvas></div></div>
+        <div><div class="chart-box short"><canvas id="profit-chart" role="img" aria-label="純利益の推移"></canvas></div></div>
       </div>
+      ${hist.some((h) => C.isNum(h.tsr)) ? `
+      <div class="chart-head" style="margin-top:14px"><h3 style="margin:0">株主総利回り ${help('tsr')}（5年前の期末＝100）</h3><button type="button" class="btn small" id="png-tsr">PNG</button></div>
+      <div id="tsr-legend"></div>
+      <div class="chart-box short"><canvas id="tsr-chart" role="img" aria-label="株主総利回りと比較指標"></canvas></div>
+      <p class="small muted">配当も含めた株主のもうけの推移を、会社が選んだ比較指標（${esc(f.tsr_index_name || '配当込みTOPIXなど')}）と並べたものです。各社が有価証券報告書で開示した値です。</p>` : ''}
       <details style="margin-top:10px"><summary>数字の表で見る</summary>
         <div class="table-wrap" style="margin-top:8px"><table>
-          <thead><tr><th>決算期</th><th class="r">売上高</th><th class="r">営業利益</th><th class="r">純利益</th><th class="r">EPS</th><th class="r">1株配当</th></tr></thead>
-          <tbody>${s.fin_history.map((h) => `<tr><td>${esc(h.fy)}</td><td class="r">${cell(h.sales, C.fmtJpAmount)}</td><td class="r">${cell(h.operating_income, C.fmtJpAmount)}</td><td class="r">${cell(h.net_income, C.fmtJpAmount)}</td><td class="r">${cell(h.eps, (v) => C.fmtNum(v, 2) + '円')}</td><td class="r">${cell(h.dps, (v) => C.fmtNum(v, 1) + '円')}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>決算期</th><th class="r">売上高</th><th class="r">経常利益等</th><th class="r">純利益</th><th class="r">EPS</th><th class="r">1株配当</th><th class="r">株主総利回り</th></tr></thead>
+          <tbody>${hist.map((h) => `<tr><td>${esc(h.fy)}</td><td class="r">${cell(h.sales, C.fmtJpAmount)}</td><td class="r">${cell(h.ordinary_income, C.fmtJpAmount)}</td><td class="r">${cell(h.net_income, C.fmtJpAmount)}</td><td class="r">${cell(h.eps, (v) => C.fmtNum(v, 2) + '円')}</td><td class="r">${cell(h.dps, (v) => C.fmtNum(v, 1) + '円')}</td><td class="r">${cell(h.tsr, (v) => C.fmtNum(v, 1) + '%')}</td></tr>`).join('')}</tbody>
         </table></div>
-        <p class="small muted" style="margin-top:6px">EPS・1株配当は各年度の決算時点の株数での値です。そのあとに株式分割をした会社（例：2026年10月に東京エレクトロンは1株→5株、キオクシアは1株→3株）は、今の株価と比べるときに分割の分だけ割って考えてください。株価のグラフと騰落率は分割を調整済みです。</p>
+        <p class="small muted">EPS・1株配当は各年度の決算時点の株数での値です（そのあとの株式分割は反映していません）。IFRSの会社は「経常利益等」が税引前利益です。</p>
       </details>
-      <p class="small muted" style="margin-top:8px">売上の成長率（3年・年平均）${help('sales_cagr_3y')}：${C.isNum(f.sales_cagr_3y) ? C.fmtPct(f.sales_cagr_3y) : '取得できず'}　／　営業利益率${help('op_margin')}：${C.isNum(f.op_margin) ? C.fmtPct(f.op_margin, { sign: false }) : '取得できず'}。出典：IR BANK（有価証券報告書のデータ）。会社によっては経常利益などが空欄です。</p>`
-      : `<p>${na()}（決算データを取得できませんでした）</p>`}
+      <p class="small muted" style="margin-top:8px">出典：金融庁 EDINET（${esc(s.name)}の有価証券報告書。必要な項目を抜き出して加工）。</p>`
+      : `<p>${finNote()}</p><p class="small"><a href="https://disclosure2.edinet-fsa.go.jp/WEEK0010.aspx" rel="noopener" target="_blank">EDINETで有価証券報告書を探す ↗</a>（「提出者名」に会社名を入れて検索）</p>`}
     </section>
 
     <section class="card">
-      <h2 style="margin-top:0">最近の主な出来事（適時開示）${help('disclosure')}</h2>
-      <div id="events" class="muted">読み込み中…</div>
+      <h2 style="margin-top:0">最近の主な提出書類（EDINET） ${help('filing')}</h2>
+      ${(s.filings || []).length
+        ? `<ul class="news-list">${s.filings.map((n) => `<li><span class="date">${esc(n.date.replaceAll('-', '/'))}</span><a href="${esc(n.url)}" rel="noopener" target="_blank">${esc(n.title)}</a></li>`).join('')}</ul><p class="small muted">出典：金融庁 EDINET。会社の最近の発表（決算短信・ニュースリリース）は、会社の公式サイトや上の外部サイトで確認できます。</p>`
+        : `<p class="muted">${store.hasFin ? 'まだありません。' : 'EDINET の APIキーを登録すると、有価証券報告書・臨時報告書などの一覧が表示されます。'}会社の最近の発表は、上の外部サイトや会社の公式サイトで確認してください。</p>`}
     </section>
   `;
 
   // ---- ポートフォリオに追加 ----
   app.querySelector('#add-pf').addEventListener('click', () => {
-    const cur = savedPortfolio() || { items: [], lot: 100, topix: {} };
+    const cur = savedPortfolio() || { items: [], lot: 100, topix: {}, prices: {} };
     if (!cur.items.some((i) => i.code === s.code)) cur.items.push({ code: s.code, amount: 250000 });
+    const m = memoPrice(s.code);
+    if (m) cur.prices = { ...(cur.prices || {}), [s.code]: m.price };
     savePortfolio(cur);
     toast(`${s.name} をポートフォリオ試算に追加しました（${cur.items.length}銘柄）`);
   });
 
-  // ---- 株価チャート ----
-  const p = await loadPrices(s.code);
-  let range = '3y';
-  const pal = palette();
-  const draw = () => {
-    const ser = priceSeries(p, range);
-    const canvas = document.getElementById('price-chart');
-    if (!canvas) return;
-    const note = document.getElementById('price-note');
-    if (!ser.length) {
-      note.textContent = '株価を取得できませんでした。';
-      return;
-    }
-    const r = RANGES.find((x) => x.id === range);
-    const first = ser[0], last = ser[ser.length - 1];
-    note.textContent = `${first[0].replaceAll('-', '/')} 〜 ${last[0].replaceAll('-', '/')}（${r.src === 'daily' ? '日足' : '週足'}の終値）　期間中の変化：${C.fmtPct(last[1] / first[1] - 1)}`;
-    lineChart(canvas, { datasets: [{ label: '株価', data: ser, color: pal.series[0] }], yFormat: (v) => C.fmtNum(v, 0) + '円' });
-  };
-  draw();
-  app.querySelectorAll('[data-range]').forEach((b) => b.addEventListener('click', () => {
-    range = b.dataset.range;
-    app.querySelectorAll('[data-range]').forEach((x) => x.setAttribute('aria-pressed', x.dataset.range === range));
-    draw();
-  }));
-  app.querySelector('#png-price').addEventListener('click', () => {
-    const ser = priceSeries(p, range);
-    if (!ser.length) return;
-    const r = RANGES.find((x) => x.id === range);
-    exportChart({
-      title: `${s.name}（${s.code}）の株価（${r.label}）`,
-      subtitle: `${ser[0][0].replaceAll('-', '/')}〜${ser[ser.length - 1][0].replaceAll('-', '/')}　期間中の変化 ${C.fmtPct(ser[ser.length - 1][1] / ser[0][1] - 1)}（${r.src === 'daily' ? '日足' : '週足'}の終値、配当は含まない）`,
-      footer: exportFooter(),
-      build: (cv, sc) => lineChart(cv, { datasets: [{ label: '株価', data: ser, color: palette(true).series[0] }], yFormat: (v) => C.fmtNum(v, 0) + '円', scale: sc, forExport: true }),
-      filename: `price_${s.code}_${r.id}.png`,
-    });
+  // ---- 株価メモ ----
+  app.querySelector('#memo-save').addEventListener('click', () => {
+    const v = parseFloat(app.querySelector('#memo-price').value);
+    const d = app.querySelector('#memo-date').value.trim().slice(0, 10) || new Date().toISOString().slice(0, 10);
+    setMemoPrice(s.code, Number.isFinite(v) ? v : null, d);
+    app.querySelector('#memo-note').textContent = Number.isFinite(v) && v > 0 ? `保存しました。100株で ${C.fmtJpAmount(v * 100)}（手数料は別）` : '株価メモを消しました。';
   });
 
   // ---- 業績グラフ ----
-  const hist = s.fin_history || [];
-  if (hist.length) {
-    const labels = hist.map((h) => h.fy);
-    const oku = (v) => (C.isNum(v) ? v / 1e8 : null);
-    const fmtOku = (v) => `${C.fmtNum(v, 0)}億円`;
-    const salesCfg = (cv, sc, ex) => barChart(cv, { labels, groups: [{ label: '売上高', values: hist.map((h) => oku(h.sales)), color: palette(ex).series[0] }], format: fmtOku, scale: sc, forExport: ex, valueLabels: !!ex });
-    const profitCfg = (cv, sc, ex) => barChart(cv, {
+  if (!hist.length) return;
+  const pal = palette();
+  const labels = hist.map((h) => h.fy);
+  const oku = (v) => (C.isNum(v) ? v / 1e8 : null);
+  const fmtOku = (v) => `${C.fmtNum(v, 0)}億円`;
+  const one = (key, label, idx) => (cv, sc, ex) => barChart(cv, { labels, groups: [{ label, values: hist.map((h) => oku(h[key])), color: palette(ex).series[idx] }], format: fmtOku, scale: sc, forExport: ex, valueLabels: !!ex });
+  const salesCfg = one('sales', '売上高', 0);
+  const profitCfg = one('net_income', '純利益', 2);
+  salesCfg(document.getElementById('sales-chart'), 1, false);
+  profitCfg(document.getElementById('profit-chart'), 1, false);
+  app.querySelector('#png-sales').addEventListener('click', () => exportChart({
+    title: `${s.name}（${s.code}）の売上高の推移`, subtitle: `単位：億円　売上の成長率（3年・年平均）${C.isNum(f.sales_cagr_3y) ? C.fmtPct(f.sales_cagr_3y) : '取得できず'}`,
+    footer: exportFooter(), build: (cv, sc) => salesCfg(cv, sc, true), filename: `sales_${s.code}.png`,
+  }));
+  app.querySelector('#png-profit').addEventListener('click', () => exportChart({
+    title: `${s.name}（${s.code}）の純利益の推移`, subtitle: '単位：億円（親会社株主に帰属する当期純利益）',
+    footer: exportFooter(), build: (cv, sc) => profitCfg(cv, sc, true), filename: `profit_${s.code}.png`,
+  }));
+  const tsrCanvas = document.getElementById('tsr-chart');
+  if (tsrCanvas) {
+    const idxName = f.tsr_index_name || '比較指標';
+    const tsrCfg = (cv, sc, ex) => barChart(cv, {
       labels,
       groups: [
-        { label: '営業利益', values: hist.map((h) => oku(h.operating_income)), color: palette(ex).series[0] },
-        { label: '純利益', values: hist.map((h) => oku(h.net_income)), color: palette(ex).series[2] },
+        { label: s.name, values: hist.map((h) => (C.isNum(h.tsr) ? h.tsr : null)), color: palette(ex).series[0] },
+        { label: idxName, values: hist.map((h) => (C.isNum(h.tsr_index) ? h.tsr_index : null)), color: palette(ex).muted },
       ],
-      format: fmtOku, scale: sc, forExport: ex,
+      format: (v) => `${C.fmtNum(v, 0)}`, scale: sc, forExport: ex,
     });
-    salesCfg(document.getElementById('sales-chart'), 1, false);
-    profitCfg(document.getElementById('profit-chart'), 1, false);
-    document.getElementById('profit-legend').innerHTML = legendHTML([{ label: '営業利益', color: pal.series[0], box: true }, { label: '純利益', color: pal.series[2], box: true }]);
-    app.querySelector('#png-sales').addEventListener('click', () => exportChart({
-      title: `${s.name}（${s.code}）の売上高の推移`,
-      subtitle: `単位：億円　売上の成長率（3年・年平均）${C.isNum(f.sales_cagr_3y) ? C.fmtPct(f.sales_cagr_3y) : '取得できず'}`,
-      footer: exportFooter(), build: (cv, sc) => salesCfg(cv, sc, true), filename: `sales_${s.code}.png`,
+    tsrCfg(tsrCanvas, 1, false);
+    document.getElementById('tsr-legend').innerHTML = legendHTML([{ label: s.name, color: pal.series[0], box: true }, { label: idxName, color: pal.muted, box: true }]);
+    app.querySelector('#png-tsr').addEventListener('click', () => exportChart({
+      title: `${s.name}（${s.code}）の株主総利回りと${idxName}`, subtitle: '5年前の決算期末＝100（配当込み）。各社の有価証券報告書の開示値',
+      legendItems: [{ label: s.name, color: palette(true).series[0], box: true }, { label: idxName, color: palette(true).muted, box: true }],
+      footer: exportFooter(), build: (cv, sc) => tsrCfg(cv, sc, true), filename: `tsr_${s.code}.png`,
     }));
-    app.querySelector('#png-profit').addEventListener('click', () => exportChart({
-      title: `${s.name}（${s.code}）の営業利益と純利益の推移`,
-      subtitle: '単位：億円',
-      legendItems: [{ label: '営業利益', color: palette(true).series[0], box: true }, { label: '純利益', color: palette(true).series[2], box: true }],
-      footer: exportFooter(), build: (cv, sc) => profitCfg(cv, sc, true), filename: `profit_${s.code}.png`,
-    }));
-  } else {
-    app.querySelector('#png-sales').disabled = true;
-    app.querySelector('#png-profit').disabled = true;
   }
-
-  // ---- 適時開示 ----
-  const ev = await loadEvents();
-  const el = document.getElementById('events');
-  if (!el) return;
-  const items = ev[s.code]?.items || [];
-  el.classList.remove('muted');
-  el.innerHTML = items.length
-    ? `<ul class="news-list">${items.slice(0, 12).map((n) => `<li><span class="date">${esc(n.date.replaceAll('-', '/'))}</span><a href="${esc(n.url)}" rel="noopener">${esc(n.title)}</a></li>`).join('')}</ul>
-       <p class="small muted">出典：IR BANK（${esc(s.name)}の適時開示の一覧、${esc((ev[s.code].fetched_at || '').replaceAll('-', '/'))}取得）。決算短信・説明資料なども、ここから原文を開けます。</p>`
-    : `<p class="muted">まだ集めていません（自動更新で順番に集めます）。<a href="https://irbank.net/${esc(s.code)}/ir" rel="noopener">IR BANKで見る</a></p>`;
-  void theme;
 }

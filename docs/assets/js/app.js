@@ -80,7 +80,7 @@ function fillFooter() {
   const m = store.meta;
   const el = document.getElementById('data-date');
   if (el && m) {
-    el.textContent = `データ：${m.data_date ? m.data_date.replaceAll('-', '/') : '—'} 時点（前営業日の終値）／ 更新：${(m.generated_at || '').replace('T', ' ').slice(0, 16)}`;
+    el.textContent = `更新：${(m.generated_at || '').replace('T', ' ').slice(0, 16)}${m.fin_latest_fy ? `／決算データの最新期：${m.fin_latest_fy}` : ''}`;
   }
 }
 

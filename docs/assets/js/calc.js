@@ -211,11 +211,33 @@ export function rebase(series, start) {
 }
 
 // ---------- URL に保存 ----------
-// p=7203:500000,6758:300000&lot=1&t1=10&t3=30&v1=15&v3=14&m1=-10&m3=-20&td=2026-09-30
-export const TOPIX_KEYS = ['t1', 't3', 'v1', 'v3', 'm1', 'm3'];
+// p=7203:500000,6758:300000  銘柄と金額
+// pr=7203:2500,6758:3000     自分で入力した今の株価（任意）
+// pp=7203:2800,6758:3500     比べたい過去の時点の株価（任意）  pd=2025-11-04 その日付
+// lot=1  t1=10 t3=30 v1=15 v3=14 m1=-10 m3=-20 td=2026-09-30  TOPIXの入力値  tp=12.3 過去の時点からのTOPIXの騰落率
+export const TOPIX_KEYS = ['t1', 't3', 'v1', 'v3', 'm1', 'm3', 'tp'];
+
+function encodeMap(m) {
+  return Object.entries(m || {}).filter(([, v]) => isNum(v) && v > 0).map(([k, v]) => `${k}:${Math.round(v * 100) / 100}`).join(',');
+}
+
+function decodeMap(str, max = 40) {
+  const out = {};
+  for (const tok of (str || '').split(',')) {
+    const m = /^([0-9]{3}[0-9A-Za-z]):(\d{1,9}(?:\.\d{1,2})?)$/.exec(tok.trim());
+    if (m && Object.keys(out).length < max) out[m[1].toUpperCase()] = Number(m[2]);
+  }
+  return out;
+}
+
 export function encodePortfolio(state) {
   const parts = [];
   if (state.items?.length) parts.push('p=' + state.items.map((i) => `${i.code}:${Math.round(i.amount || 0)}`).join(','));
+  const pr = encodeMap(state.prices);
+  if (pr) parts.push('pr=' + pr);
+  const pp = encodeMap(state.pastPrices);
+  if (pp) parts.push('pp=' + pp);
+  if (state.pastDate) parts.push('pd=' + encodeURIComponent(state.pastDate));
   if (state.lot && state.lot !== 100) parts.push('lot=' + state.lot);
   const t = state.topix || {};
   for (const k of TOPIX_KEYS) if (isNum(t[k])) parts.push(`${k}=${t[k]}`);
@@ -243,7 +265,31 @@ export function decodePortfolio(query) {
     if (Number.isFinite(v)) topix[k] = v;
   }
   if (params.get('td')) topix.td = params.get('td').slice(0, 10);
-  return { items: items.slice(0, 40), lot, topix, name: (params.get('n') || '').slice(0, 40) };
+  return {
+    items: items.slice(0, 40),
+    prices: decodeMap(params.get('pr')),
+    pastPrices: decodeMap(params.get('pp')),
+    pastDate: (params.get('pd') || '').slice(0, 10),
+    lot,
+    topix,
+    name: (params.get('n') || '').slice(0, 40),
+  };
+}
+
+// 今の金額の割合で、過去の時点に買っていたら今どれくらいか（入力された株価だけで計算）
+export function pastReturn(rows, pastPrices) {
+  const used = rows.filter((r) => r.cost > 0 && isNum(r.price) && isNum(pastPrices[r.code]) && pastPrices[r.code] > 0);
+  const total = used.reduce((s, r) => s + r.cost, 0);
+  if (!total) return { ret: null, used: [] };
+  const ratio = used.reduce((s, r) => s + (r.cost / total) * (r.price / pastPrices[r.code]), 0);
+  return { ret: ratio - 1, used: used.map((r) => r.code) };
+}
+
+// 加重平均（重みが0やデータなしは除く）
+export function weightedAverage(pairs) {
+  const ok = pairs.filter(([w, v]) => w > 0 && isNum(v));
+  const tw = ok.reduce((s, [w]) => s + w, 0);
+  return tw ? { value: ok.reduce((s, [w, v]) => s + w * v, 0) / tw, coverage: tw } : { value: null, coverage: 0 };
 }
 
 // ---------- 表の並べ替え ----------

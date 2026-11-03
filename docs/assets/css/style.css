@@ -176,7 +176,7 @@ label { color: var(--ink-2); font-size: 0.9rem; }
 .tile .sub { font-size: 0.78rem; color: var(--muted); }
 
 /* ---------- 表 ---------- */
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); -webkit-overflow-scrolling: touch; }
+.table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); -webkit-overflow-scrolling: touch; }
 table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
 th, td { padding: 8px 10px; border-bottom: 1px solid var(--grid); text-align: left; vertical-align: top; }
 th { background: var(--surface-2); font-weight: 600; color: var(--ink-2); white-space: nowrap; position: sticky; top: 0; }

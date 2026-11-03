@@ -1,5 +1,5 @@
 import * as C from '../calc.js';
-import { store, esc, help, themeColor, signed, na } from '../ui.js';
+import { store, esc, help, themeColor } from '../ui.js';
 
 export function renderHome(app) {
   document.title = 'テーマ別 銘柄リサーチ';
@@ -7,17 +7,18 @@ export function renderHome(app) {
   const rules = store.rules.portfolio;
   const warnings = (m.warnings || []).length;
   const cards = store.themes.map((t) => {
-    const s = store.themeSummary[t.id] || { median: {} };
-    const med = s.median || {};
+    const s = store.themeSummary[t.id] || { median: {}, industries: {} };
+    const inds = Object.entries(s.industries || {}).slice(0, 3).map(([k, v]) => `${esc(k)} ${v}`).join('・');
+    const g = s.median?.sales_cagr_3y;
     return `
       <article class="card theme-card" style="--tc:${themeColor(t.id)}">
         <h3><a href="#/theme/${t.id}">${esc(t.name)}</a></h3>
         <p class="small ink2" style="margin:0">${esc(t.description)}</p>
         <div class="stats">
           <div>候補<b>${s.count ?? 0}社</b></div>
-          <div>1年の騰落率<br><small>（中央値）</small><b>${C.isNum(med.return_1y) ? signed(med.return_1y) : na()}</b></div>
-          <div>PER<br><small>（中央値）</small><b>${C.isNum(med.per) ? C.fmtTimes(med.per) : na()}</b></div>
+          <div style="grid-column:span 2">多い業種<b style="font-size:.85rem">${inds || '—'}</b></div>
         </div>
+        ${C.isNum(g) ? `<div class="small ink2">売上の成長率（3年・中央値）${help('sales_cagr_3y')}：<b>${C.fmtPct(g)}</b></div>` : ''}
         <div class="row">
           <a class="btn small" href="#/theme/${t.id}">銘柄一覧と関係</a>
           <a class="btn small" href="#/compare?theme=${t.id}">比較表で見る</a>
@@ -30,20 +31,21 @@ export function renderHome(app) {
       <h1>テーマ別 銘柄リサーチ</h1>
       <p class="lead">日経STOCKリーグ（第27回・2026年度）に向けて、<b>テーマを決める → 銘柄を選ぶ → 発表資料を作る</b>ための、グループ用の学習ページです。</p>
       <div class="notice info">
-        データは <b>${m.data_date ? m.data_date.replaceAll('-', '/') : '—'}</b> 時点（前営業日の終値）。
-        候補 ${m.counts.stocks}社のうち株価を取得できたのは ${m.counts.with_price}社。
-        平日の夕方に自動で更新します。${warnings ? `<a href="#/about">取得時の注意 ${warnings}件</a>` : ''}
+        <b>株価・PER・チャートなどの市場データは、このページでは自動表示していません。</b>
+        株価のデータは取引所などの権利があり、規約上問題なく自動で集めて公開できるデータ源が見つからなかったためです（<a href="#/about">理由</a>）。
+        株価は STOCKリーグのバーチャル投資システムや証券会社のサイトで確認し、<b>ポートフォリオ試算</b>や各銘柄の「株価メモ」に入力して使ってください。
+        ${warnings ? `<br><a href="#/about">データ作成時の注意 ${warnings}件</a>` : ''}
       </div>
     </section>
 
     <section class="card">
       <h2 style="margin-top:0">使い方（おすすめの順番）</h2>
       <ol class="steps">
-        <li><a href="#/themes">テーマ比較</a>で、5つのテーマの数字（銘柄数・値動き・割安さ・成長）を見比べる</li>
-        <li>気になるテーマの「銘柄一覧と関係」で、各社が<b>なぜそのテーマに関係するか</b>と出典を確認する</li>
-        <li><a href="#/compare">銘柄の比較表</a>で、指標を並べ替え・絞り込みして候補をしぼる（見出しの <span class="help" aria-hidden="true">?</span> で用語の説明）</li>
-        <li>銘柄名を押して、事業・株価チャート・業績の推移・最近の出来事を見る</li>
-        <li><a href="#/portfolio">ポートフォリオ試算</a>で${(rules.min_stocks)}〜${rules.max_stocks}銘柄・${C.fmtJpAmount(rules.budget_yen)}の組み合わせを試し、<b>「共有用のURLをコピー」</b>でグループに送る</li>
+        <li>下の5つのテーマから気になるものを選び、「銘柄一覧と関係」で各社が<b>なぜそのテーマに関係するか</b>と出典を確認する</li>
+        <li><a href="#/themes">テーマ比較</a>で、テーマごとの銘柄数・業種の内訳${store.hasFin ? '・業績' : ''}を見比べる</li>
+        <li><a href="#/compare">銘柄の比較表</a>で並べ替え・絞り込みをして候補をしぼる（見出しの <span class="help" aria-hidden="true">?</span> で用語の説明）</li>
+        <li>銘柄名を押して詳しく見る。株価やチャートは、ページ内のリンク（外部サイト）で確認</li>
+        <li><a href="#/portfolio">ポートフォリオ試算</a>で${rules.min_stocks}〜${rules.max_stocks}銘柄・${C.fmtJpAmount(rules.budget_yen)}の組み合わせを試し（株価は自分で入力）、<b>「共有用のURLをコピー」</b>でグループに送る</li>
         <li>表やグラフの<b>「PNGで保存」</b>で横長の画像を作り、発表スライドに貼る</li>
       </ol>
     </section>

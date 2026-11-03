@@ -23,17 +23,19 @@ await new Promise((r) => server.listen(0, r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 
 const stocks = JSON.parse(fs.readFileSync(path.join(root, 'data/stocks.json'), 'utf8'));
-const withPrice = stocks.find((s) => s.price) || stocks[0];
-const pf = stocks.filter((s) => s.price).slice(0, 12).map((s) => `${s.code}:400000`).join(',');
+const first = stocks[0];
+const pick = stocks.slice(0, 12);
+const pf = pick.map((s) => `${s.code}:400000`).join(',');
+const pr = pick.map((s, i) => `${s.code}:${1000 + i * 250}`).join(',');
 const routes = [
   ['home', '#/'],
   ['rules', '#/rules'],
   ['theme', '#/theme/semicon'],
   ['compare', '#/compare'],
-  ['compare-filter', '#/compare?theme=raremetal&sort=return_1y'],
-  ['stock', `#/stock/${withPrice.code}`],
+  ['compare-filter', '#/compare?theme=raremetal&sort=industry&dir=desc'],
+  ['stock', `#/stock/${first.code}`],
   ['themes', '#/themes'],
-  ['portfolio', `#/portfolio?p=${pf}&t1=30&t3=80`],
+  ['portfolio', `#/portfolio?p=${pf}&pr=${pr}&pp=${pr}&pd=2025-11-04&tp=20`],
   ['news', '#/news?theme=energy'],
   ['glossary', '#/glossary'],
   ['about', '#/about'],
