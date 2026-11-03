@@ -231,8 +231,8 @@ th.sticky-col { z-index: 2; background: var(--surface-2); }
 .suggest button:hover, .suggest button:focus-visible { background: var(--accent-wash); }
 .sum-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .bar-row { display: grid; grid-template-columns: minmax(80px, 9em) 1fr 4.5em; gap: 8px; align-items: center; font-size: 0.85rem; margin: 4px 0; }
-.bar-row .track { background: var(--surface-2); border-radius: 4px; height: 12px; overflow: hidden; }
-.bar-row .fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.bar-row .track { display: block; background: var(--surface-2); border-radius: 4px; height: 12px; overflow: hidden; }
+.bar-row .fill { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
 
 /* ---------- フッター ---------- */
 .site-footer { border-top: 1px solid var(--border); background: var(--surface); color: var(--ink-2); font-size: 0.85rem; }

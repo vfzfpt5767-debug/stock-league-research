@@ -80,7 +80,7 @@ export async function renderTheme(app, id) {
     exportWrappedTable({
       title: `テーマ「${t.name}」の候補銘柄（${i * PER_PAGE + 1}〜${i * PER_PAGE + part.length}社目／全${members.length}社）`,
       subtitle: '業種順。「テーマとの関係」は公開情報をもとにした要約',
-      footer: exportFooter('（関係の出典は各銘柄ページ）'),
+      footer: exportFooter(),
       columns: [{ label: '銘柄', width: 1.5, wrap: true }, { label: 'テーマとの関係', width: 4.2, wrap: true }, { label: '業種', width: 1.0, wrap: true }],
       rows: part.map((m) => [`${m.name}（${m.code}）`, m.reasons[id].reason, m.industry || '取得できず']),
       filename: `theme_${id}_${i + 1}.png`,
