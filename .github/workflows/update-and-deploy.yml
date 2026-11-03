@@ -72,7 +72,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/data
-          if git diff --cached --quiet; then
+          # 更新時刻（meta.json）だけが変わったときはコミットしない
+          if git diff --cached --quiet -- docs/data ':!docs/data/meta.json'; then
             echo "データに変更はありません"
           else
             git commit -m "データ更新 $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M') JST"
