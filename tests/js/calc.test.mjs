@@ -94,3 +94,10 @@ test('表示の書式', () => {
   assert.equal(C.fmtJpAmount(123456789), '1億円');
   assert.equal(C.fmtYen(3040), '3,040円');
 });
+
+test('期間の最初は「ちょうどその日に最も近い」値を使う', () => {
+  const s = [['2025-10-24', 90], ['2025-10-31', 100], ['2025-11-07', 110]];
+  assert.deepEqual(C.closeNearest(s, '2025-11-02', 10), ['2025-10-31', 100]);
+  assert.deepEqual(C.closeNearest(s, '2025-11-05', 10), ['2025-11-07', 110]);
+  assert.equal(C.closeNearest(s, '2026-01-01', 10), null);
+});

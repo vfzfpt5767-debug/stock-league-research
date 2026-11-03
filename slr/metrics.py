@@ -27,10 +27,23 @@ def close_on_or_before(series: Series, target: str) -> tuple[str, float] | None:
     return found
 
 
-def period_return(series: Series, end: str, days: int, tolerance_days: int = 10) -> float | None:
-    """end 時点の終値と、days 日前（以前で最も近い日）の終値から騰落率を計算する。
+def close_nearest(series: Series, target: str, tolerance_days: int) -> tuple[str, float] | None:
+    """target に最も近い日の終値（前後 tolerance_days 日以内）。同じ近さなら前の日を優先。"""
+    t = _d(target)
+    best = None
+    for d, c in series:
+        diff = abs((_d(d) - t).days)
+        if diff > tolerance_days:
+            continue
+        if best is None or diff < best[0] or (diff == best[0] and d <= target):
+            best = (diff, (d, c))
+    return best[1] if best else None
 
-    系列が十分に古くまでない場合（開始点が days+tolerance より新しい）は None。
+
+def period_return(series: Series, end: str, days: int, tolerance_days: int = 10) -> float | None:
+    """end 時点の終値と、ちょうど days 日前に最も近い終値から騰落率を計算する。
+
+    その近く（前後 tolerance_days 日）に株価がない場合（上場が新しいなど）は None。
     """
     if not series:
         return None
@@ -38,12 +51,8 @@ def period_return(series: Series, end: str, days: int, tolerance_days: int = 10)
     if e is None:
         return None
     target = (_d(end) - timedelta(days=days)).isoformat()
-    s = close_on_or_before(series, target)
-    if s is None:
-        return None
-    if (_d(target) - _d(s[0])).days > tolerance_days:
-        return None
-    if s[1] <= 0:
+    s = close_nearest(series, target, tolerance_days)
+    if s is None or s[0] >= e[0] or s[1] <= 0:
         return None
     return e[1] / s[1] - 1.0
 

@@ -60,6 +60,17 @@ export function closeOnOrBefore(series, date) {
   return found;
 }
 
+// target に最も近い日の値（前後 tol 日以内）。同じ近さなら前の日を優先
+export function closeNearest(series, target, tol = 10) {
+  let best = null;
+  for (const [d, v] of series) {
+    const diff = Math.abs(daysBetween(d, target));
+    if (diff > tol) continue;
+    if (!best || diff < best.diff || (diff === best.diff && d <= target)) best = { diff, p: [d, v] };
+  }
+  return best ? best.p : null;
+}
+
 export function addDays(iso, days) {
   const t = Date.parse(iso + 'T00:00:00Z') + days * DAY;
   return new Date(t).toISOString().slice(0, 10);
@@ -158,8 +169,8 @@ export function backtest(weights, weekly, start, end) {
   const base = {};
   for (const code of Object.keys(weights)) {
     const s = weekly[code] || [];
-    const b = closeOnOrBefore(s, start);
-    if (!b || daysBetween(b[0], start) > 14 || !(weights[code] > 0)) { excluded.push(code); continue; }
+    const b = closeNearest(s, start, 10);
+    if (!b || !(weights[code] > 0)) { excluded.push(code); continue; }
     base[code] = b[1];
     included.push(code);
   }
@@ -194,7 +205,7 @@ export function seriesStats(series) {
 }
 
 export function rebase(series, start) {
-  const b = closeOnOrBefore(series, start);
+  const b = closeNearest(series, start, 10) || closeOnOrBefore(series, start);
   if (!b) return [];
   return series.filter(([d]) => d >= b[0]).map(([d, v]) => [d === b[0] ? start : d, (v / b[1]) * 100]);
 }

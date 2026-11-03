@@ -31,11 +31,10 @@ function priceSeries(p, range) {
   }
   if (!s.length) return [];
   if (r.days) {
-    // 騰落率の計算と同じく「開始日以前で最も近い終値」から表示する
+    // 騰落率の計算と同じく「ちょうど期間前に最も近い終値」から表示する
     const start = C.addDays(s[s.length - 1][0], -r.days);
-    let i = s.findIndex(([d]) => d > start);
-    if (i > 0) i -= 1;
-    s = i >= 0 ? s.slice(i) : s;
+    const near = C.closeNearest(s, start, 10);
+    s = near ? s.filter(([d]) => d >= near[0]) : s.filter(([d]) => d >= start);
   }
   return s;
 }

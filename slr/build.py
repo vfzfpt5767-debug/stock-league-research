@@ -387,8 +387,8 @@ class Builder:
         series = []
         base = {}
         for code, w in self.weekly_by_code.items():
-            b = metrics.close_on_or_before(w, start) or (w[0] if w and w[0][0] <= weeks[0] else None)
-            if b and (date.fromisoformat(start) - date.fromisoformat(b[0])).days <= 14:
+            b = metrics.close_nearest(w, start, 10)
+            if b:
                 base[code] = b[1]
         if not base:
             self.bench = None
