@@ -65,7 +65,7 @@ export function renderAbout(app) {
         <tbody>
           <tr><td>株価（前営業日の終値・日足／週足）、時価総額、PER、PBR、配当利回り、ROE</td><td><a href="https://irbank.net/" rel="noopener">IR BANK</a></td><td>robots.txt で自動取得を許可。ダウンロードページに「Web公開で利用の際はリンク必須」「過剰アクセス禁止」とあるため、各ページにリンクを付け、3〜10秒の間隔を空けてアクセスし、結果を保存して再利用しています。</td></tr>
           <tr><td>売上高・営業利益・純利益・EPS・BPS・1株配当（年度ごと）</td><td>IR BANK「決算・財務データ（全銘柄一括CSV）」</td><td>同上。週1回だけ取得。</td></tr>
-          <tr><td>最近の主な出来事・テーマのニュース（適時開示の見出し）</td><td>IR BANK（各社の適時開示の一覧）</td><td>同上。1回の更新で取り直すのは最大40社まで。</td></tr>
+          <tr><td>最近の主な出来事・テーマのニュース（適時開示の見出し）</td><td>IR BANK（各社の適時開示の一覧）</td><td>同上。1回の更新で取り直すのは最大30社まで（約1週間で全社を一巡）。</td></tr>
           <tr><td>業種・決算日</td><td><a href="https://disclosure2dl.edinet-fsa.go.jp/guide/static/disclosure/WZEK0030.html" rel="noopener">金融庁 EDINET（EDINETコードリスト）</a></td><td>公共データ利用規約（PDL1.0）。出典を明記し、業種・決算日の列だけを抜き出して加工しています。</td></tr>
           <tr><td>ルール</td><td><a href="https://manabow.com/sl/" rel="noopener">日経STOCKリーグ公式（man@bow）</a></td><td>要点を要約し、出典を明記（<a href="#/rules">ルール</a>）。</td></tr>
           <tr><td>テーマとの関係の一言</td><td>Wikipedia・各社の発表・報道など（各銘柄に出典リンク）</td><td>本文に根拠となる語句があることを確認して作成。</td></tr>
