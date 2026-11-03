@@ -189,6 +189,23 @@ def fin_summary(years: dict[str, dict]) -> dict:
     out["dps"] = last.get("dps")
     out["roe_actual"] = last.get("roe")
     out["equity_ratio"] = last.get("equity_ratio")
+    out["payout_ratio"] = last.get("payout_ratio")
+    out["per_fy_end"] = last.get("per")
     out["profit_years_negative"] = sum(1 for h in hist if (h.get("net_income") or 0) < 0)
     out["sales_points"] = sum(1 for x in sales if x is not None)
+    # 株主総利回り（TSR）：有価証券報告書の値は「5年前の期末＝100」の累積（%）。比較指標（例：配当込みTOPIX）も同じ。
+    def tsr_change(key, years):
+        if len(hist) <= years:
+            return None
+        a, b = hist[-1 - years].get(key), last.get(key)
+        return (b / a - 1.0) if (a and b and a > 0) else None
+
+    for k, src in (("tsr", "tsr"), ("tsr_index", "tsr_index")):
+        suffix = "" if k == "tsr" else "_index"
+        out[f"tsr_1y{suffix}"] = tsr_change(src, 1)
+        out[f"tsr_3y{suffix}"] = tsr_change(src, 3)
+        out[f"tsr_5y{suffix}"] = (last.get(src) / 100.0 - 1.0) if last.get(src) else None
+    out["tsr_index_name"] = last.get("tsr_index_name")
+    t5, i5 = out.get("tsr_5y"), out.get("tsr_5y_index")
+    out["tsr_5y_vs_index"] = (t5 - i5) if (t5 is not None and i5 is not None) else None
     return out

@@ -1,12 +1,14 @@
 # データの自動更新と公開
-# - 平日の夕方（日本時間 18:37ごろ）に株価・指標を取り直して docs/data に保存し、GitHub Pages に公開する
+# - 毎週月曜の夕方（日本時間 18:37ごろ）に、金融庁 EDINET の会社情報・決算データを取り直して docs/data に保存し、GitHub Pages に公開する
+#   （決算データは、リポジトリの Secret「EDINET_API_KEY」が登録されているときだけ取得する）
+# - 株価などの市場データは取得しない（規約上問題なく取得・公開できるデータ源がないため。DECISIONS.md 参照）
 # - main ブランチに変更が入ったとき（CSVの編集など）も、データを作り直して公開する
 # - 「Actions」タブの「Run workflow」ボタンで手動でも実行できる
 name: データ更新と公開
 
 on:
   schedule:
-    - cron: "37 9 * * 1-5"   # UTC 9:37 = 日本時間 18:37（月〜金）
+    - cron: "37 9 * * 1"   # UTC 9:37 = 日本時間 18:37（毎週月曜）
   push:
     branches: [main]
     paths:
@@ -17,10 +19,10 @@ on:
       - ".github/workflows/update-and-deploy.yml"
   workflow_dispatch:
     inputs:
-      force:
-        description: "今日すでに更新済みでも取り直す"
-        type: boolean
-        default: false
+      days:
+        description: "EDINETの提出書類一覧を調べる日数の上限（初回は400程度）"
+        type: number
+        default: 60
 
 permissions:
   contents: write
@@ -60,8 +62,10 @@ jobs:
           restore-keys: http-cache-
 
       - name: データを集める
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
         run: |
-          python -m slr.build --max-requests 450 --max-history-fetch 30 --max-event-fetch 30 ${{ inputs.force && '--force' || '' }}
+          python -m slr.build --edinet-max-days ${{ inputs.days || 60 }}
 
       - name: 変わったデータを保存（コミット）
         run: |

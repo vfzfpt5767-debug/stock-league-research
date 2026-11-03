@@ -31,6 +31,7 @@ class SiteRestricted(RuntimeError):
 
 
 # 相手サイトが制限中であることを示す文字列（見つけたらキャッシュせず、そのサイトへのアクセスを止める）
+# （例：「高負荷につき表示制限中」）
 RESTRICTION_MARKERS = ["表示制限中".encode("utf-8")]
 
 
@@ -117,6 +118,10 @@ class PoliteClient:
                     last_err = RuntimeError(f"HTTP {r.status_code} for {url}")
                     time.sleep(interval * (attempt + 2) * 2)
                     continue
+                if r.status_code in (401, 403):
+                    # アクセスを拒否された：この実行ではそのサイトに二度とアクセスしない（回避もしない）
+                    self.blocked.add(_block_key(url))
+                    raise SiteRestricted(f"HTTP {r.status_code}: {url} へのアクセスが拒否されました。この実行では {_block_key(url)} へのアクセスを止めます")
                 if 400 <= r.status_code < 500:
                     # 404 などはやり直しても同じなので、すぐにエラーにする
                     raise PageNotFound(f"HTTP {r.status_code} for {url}")
